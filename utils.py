@@ -11,7 +11,7 @@ out_file_path = Path(file_path / "test_out/")
 cam_width, cam_height = 1280, 720
 # input size to the model
 # VGG trained in 656*368; mobilenet_thin trained in 432*368 (from tf-pose-estimation)
-input_width, input_height = 656, 368
+input_width, input_height = 432, 368
 
 
 def choose_run_mode(args):

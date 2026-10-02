@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 import numpy as np
 import cv2 as cv
+from collections import Counter, deque
 from pathlib import Path
 from Tracking.deep_sort import preprocessing
 from Tracking.deep_sort.nn_matching import NearestNeighborDistanceMetric
@@ -28,6 +29,14 @@ tracker = Tracker(metric)
 
 # track_box颜色
 trk_clr = (0, 255, 0)
+
+# Per-track history: smooth the framewise labels (majority vote) and
+# use horizontal movement of the box to tell walking from standing
+smooth_len = 10
+motion_len = 15
+walk_move_ratio = 0.15  # box-centre travel, as a fraction of frame width
+label_hist = {}
+center_hist = {}
 
 
 # class ActionRecognizer(object):
@@ -152,6 +161,15 @@ def framewise_recognize(pose, pretrained_model):
                 joints_norm_single_person = np.array(joints_norm_single_person).reshape(-1, 36)
                 pred = np.argmax(pretrained_model.predict(joints_norm_single_person))
                 init_label = Actions(pred).name
+                trk_id_ = int(d[4])
+                hist = label_hist.setdefault(trk_id_, deque(maxlen=smooth_len))
+                hist.append(init_label)
+                init_label = Counter(hist).most_common(1)[0][0]
+                centers = center_hist.setdefault(trk_id_, deque(maxlen=motion_len))
+                centers.append((xmin + xmax) / 2.)
+                if (init_label == 'stand' and len(centers) == motion_len
+                        and max(centers) - min(centers) > walk_move_ratio * frame.shape[1]):
+                    init_label = 'walk'
                 # 显示动作类别
                 cv.putText(frame, init_label, (xmin + 80, ymin - 45), cv.FONT_HERSHEY_SIMPLEX, 1, trk_clr, 3)
                 # 异常预警(under scene)
